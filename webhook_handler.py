@@ -104,39 +104,44 @@ class WebhookHandler(BaseHTTPRequestHandler):
             print(f"   ℹ️  Событие '{event_type}' - базовое логирование")
 
     def _handle_push_event(self, payload):
-        """Обработка push события — версия для catty-reminders-app"""
+        """Обработка push события"""
         
         branch = payload.get('ref', '').replace('refs/heads/', '')
-        pusher = payload.get('pusher', {}).get('name', 'unknown')
+        commit_sha = payload.get('after', 'NA')  # ← Хеш коммита от GitHub!
         
         print(f"📦 Push в ветку: {branch}")
-        print(f"👤 Автор: {pusher}")
-
+        print(f"🔖 Commit SHA: {commit_sha}")
+        
         APP_DIR = "/home/andrey/Desktop/DevOps_lab1/catty-reminders-app"
-        APP_SERVICE = "catty-app" 
+        APP_SERVICE = "catty-app"
         
         try:
+            # 1. Обновляем код
             print("🔄 git pull...")
             subprocess.run(['git', '-C', APP_DIR, 'fetch'], check=True, capture_output=True)
             subprocess.run(['git', '-C', APP_DIR, 'checkout', branch], check=True, capture_output=True)
             subprocess.run(['git', '-C', APP_DIR, 'pull', 'origin', branch], check=True, capture_output=True)
             print("✅ Код обновлён")
-
-            req_file = os.path.join(APP_DIR, 'requirements.txt')
-            if os.path.exists(req_file):
+            
+            # 2. 🔥 ВАЖНО: Записываем хеш коммита в файл!
+            print(f"📝 Запись deploy_ref: {commit_sha}")
+            with open(f"{APP_DIR}/deploy_ref.txt", 'w') as f:
+                f.write(commit_sha)
+            
+            # 3. Установка зависимостей
+            if os.path.exists(f"{APP_DIR}/requirements.txt"):
                 print("📦 Установка зависимостей...")
-                subprocess.run(['pip3', 'install', '--break-system-packages', '-r', req_file], 
+                subprocess.run(['pip3', 'install', '--break-system-packages', '-r', f"{APP_DIR}/requirements.txt"], 
                              check=True, capture_output=True)
                 print("✅ Зависимости установлены")
-
+            
+            # 4. Перезапуск приложения
             print(f"🚀 Перезапуск сервиса {APP_SERVICE}...")
             subprocess.run(['sudo', 'systemctl', 'restart', APP_SERVICE], check=True)
             print("✅ Деплой завершён!")
             
         except subprocess.CalledProcessError as e:
             print(f"❌ Ошибка деплоя: {e}")
-            print(f"   stdout: {e.stdout}")
-            print(f"   stderr: {e.stderr}")
 
 
     def _handle_pr_event(self, payload):
