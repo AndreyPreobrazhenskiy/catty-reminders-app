@@ -4,47 +4,42 @@
 Показывает как Git события могут запускать автоматические процессы
 """
 
-import tempfile
 import subprocess
 import os
 import json
-import hashlib
-import hmac
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
-import sys
 
-# Конфигурация
+# ================= КОНФИГУРАЦИЯ =================
 PORT = 8080
-APP_DIR = "/home/kali/catty-reminders-app"
+APP_DIR = "/home/andrey/Desktop/DevOps_lab1/catty-reminders-app"
+APP_SERVICE = "catty-app"
+# ================================================
 
 class WebhookHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         """Обработка POST запросов от GitHub"""
-
-        # Получаем размер данных
         content_length = int(self.headers.get('Content-Length', 0))
-
-        # Читаем данные
         body = self.rfile.read(content_length)
-
-        # Парсим JSON
+        
         try:
             payload = json.loads(body.decode('utf-8'))
             self._process_webhook(payload)
-
-            # Отвечаем успехом
+            
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
-            self.wfile.write(b'{"status": "success"}')
-
+            try:
+                self.wfile.write(b'{"status": "success"}')
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            
         except json.JSONDecodeError:
             print("❌ Ошибка парсинга JSON")
             self.send_response(400)
             self.end_headers()
-
+    
     def do_GET(self):
         """Простая страница статуса"""
         self.send_response(200)
@@ -80,11 +75,12 @@ class WebhookHandler(BaseHTTPRequestHandler):
         """.format(time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"), port=PORT)
 
         self.wfile.write(html.encode('utf-8'))
+    
+    def log_message(self, *args):
+        pass 
 
     def _process_webhook(self, payload):
         """Обработка webhook события"""
-
-        # Получаем информацию о событии
         event_type = self.headers.get('X-GitHub-Event', 'unknown')
         repo_name = payload.get('repository', {}).get('full_name', 'unknown')
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -94,7 +90,6 @@ class WebhookHandler(BaseHTTPRequestHandler):
         print(f"   Тип события: {event_type}")
         print(f"   Репозиторий: {repo_name}")
 
-        # Обрабатываем разные типы событий
         if event_type == 'push':
             self._handle_push_event(payload)
         elif event_type == 'pull_request':
@@ -105,87 +100,45 @@ class WebhookHandler(BaseHTTPRequestHandler):
             print(f"   ℹ️  Событие '{event_type}' - базовое логирование")
 
     def _handle_push_event(self, payload):
-        """Обработка push события"""
-        commits = payload.get('commits', [])
+        """Обработка push события — ПРОСТАЯ ВЕРСИЯ БЕЗ ТЕСТОВ"""
         branch = payload.get('ref', '').replace('refs/heads/', '')
+        commit_sha = payload.get('after', 'unknown')
         pusher = payload.get('pusher', {}).get('name', 'unknown')
-        clone_url = payload.get('repository', {}).get('clone_url', 'unknown')
 
         print(f"   📝 Push в ветку: {branch}")
         print(f"   👤 Автор: {pusher}")
-        print(f"   📊 Коммитов: {len(commits)}")
-
-        # Имитируем автоматические действия
+        print(f"   🔖 Commit SHA: {commit_sha}")
         print(f"   🚀 ЗАПУСКАЕМ АВТОМАТИЗАЦИЮ:")
-        print(f"      - Запуск тестов для ветки {branch}")
-        print(f"      - Проверка качества кода")
+        
+        try:
+            print("      - Обновление рабочей папки приложения...")
+            
+            subprocess.run(["git", "-C", APP_DIR, "fetch", "origin"], check=True, capture_output=True)
+            subprocess.run(["git", "-C", APP_DIR, "checkout", branch], check=True, capture_output=True)
+            subprocess.run(["git", "-C", APP_DIR, "reset", "--hard", f"origin/{branch}"], check=True, capture_output=True)
+            
+            print(f"      ✅ Рабочая папка обновлена до {commit_sha[:12]}")
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            print(f"Временная директория: {tmpdir}")
-
-            # Выполняем git clone
-            subprocess.run(
-                ["git", "clone", clone_url, tmpdir],
-                check=True
-            )
-
-            subprocess.run(
-                ["git", "checkout", branch],
-                cwd=tmpdir,
-                check=True
-            )
-
-            # Запускаем тесты перед деплоем
-            print(f"      - Запуск тестов...")
-            try:
-                result = subprocess.run(
-                    ["./test.sh"],
-                    cwd=tmpdir,
-                    check=True,
-                    capture_output=True,
-                    text=True
-                )
-                print(f"      ✅ Тесты прошли успешно!")
-                print(f"         {result.stdout.strip()}")
-                print(f"      Обновляем рабочую папку приложения...")
-                subprocess.run(
-                    ["git", "fetch", "origin"],
-                    cwd=APP_DIR,
-                    check=True
-                )
-                subprocess.run(
-                    ["git", "checkout", branch],
-                    cwd=APP_DIR,
-                    check=True
-                )
-                subprocess.run(
-                    ["git", "reset", "--hard", f"origin/{branch}"],
-                    cwd=APP_DIR,
-                    check=True
-                )
-                print(f"      Рабочая папка обновлена")
-                print(f"      Запуск деплоя из рабочей папки...")
-                subprocess.run(
-                    ["./deploy.sh"],
-                    cwd=APP_DIR,
-                    check=True
-                )
-                print(f"      ✅ Деплой завершен успешно!")
-                
-            except subprocess.CalledProcessError as e:
-                print(f"      ❌ Тесты упали! Деплой ОТМЕНЕН")
-                print(f"         {e.stdout if e.stdout else 'Нет вывода'}")
-                if e.stderr:
-                    print(f"         Ошибка: {e.stderr}")
-                return
-
+            req_file = os.path.join(APP_DIR, 'requirements.txt')
+            if os.path.exists(req_file):
+                print("      - Установка зависимостей...")
+                subprocess.run(['pip3', 'install', '--break-system-packages', '-r', req_file], check=True, capture_output=True)
+                print("      ✅ Зависимости установлены")
+            
+            print(f"      - Перезапуск сервиса {APP_SERVICE}...")
+            subprocess.run(['sudo', 'systemctl', 'restart', APP_SERVICE], check=True)
+            print(f"      ✅ Деплой завершён!")
+            
+        except subprocess.CalledProcessError as e:
+            print(f"      ❌ Ошибка деплоя: {e}")
+            if e.stdout: print(f"         stdout: {e.stdout.decode()}")
+            if e.stderr: print(f"         stderr: {e.stderr.decode()}")
 
     def _handle_pr_event(self, payload):
         """Обработка Pull Request события"""
         action = payload.get('action', '')
         pr_number = payload.get('pull_request', {}).get('number', '')
         title = payload.get('pull_request', {}).get('title', '')
-
         print(f"   🔀 Pull Request #{pr_number}: {action}")
         print(f"   📋 Заголовок: {title}")
 
@@ -193,16 +146,14 @@ class WebhookHandler(BaseHTTPRequestHandler):
         """Обработка Release события"""
         action = payload.get('action', '')
         tag_name = payload.get('release', {}).get('tag_name', '')
-
         print(f"   🏷️  Release {tag_name}: {action}")
 
 def main():
     """Запуск webhook сервера"""
-
     print(f"🚀 Запуск DevOps Webhook Demo Server")
     print(f"📡 Порт: {PORT}")
     print(f"🌐 URL: http://0.0.0.0:{PORT}")
-    print(f"🔧 Webhook URL: http://0.0.0.0:{PORT}/webhook")
+    print(f"📁 App directory: {APP_DIR}")
     print(f"⏰ Время запуска: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"\n👀 Ожидание webhook событий от GitHub...")
     print(f"💡 Для остановки: Ctrl+C\n")
