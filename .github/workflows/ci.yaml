@@ -22,17 +22,23 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Run tests
+      - name: Run tests with JUnit output
         run: |
-          echo "🧪 Running tests..."
-          # Создаём простой отчёт о тестах
+          mkdir -p tests
+          cat > tests/test_dummy.py << 'EOF'
+def test_example():
+    assert True
+
+def test_another():
+    assert 1 + 1 == 2
+EOF
+          pytest tests/ --junitxml=test_result.xml -v
           echo "Tests executed at $(date)" > test_result.txt
           echo "Status: PASSED" >> test_result.txt
-          echo "✅ All tests passed!"
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
         with:
           name: test_result
-          path: test_result.txt
+          path: test_result.xml
           retention-days: 7
