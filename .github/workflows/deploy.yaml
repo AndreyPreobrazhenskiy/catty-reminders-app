@@ -1,0 +1,49 @@
+name: CD Pipeline
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies (on Runner)
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Deploy to VM via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: course.prafdin.ru
+          port: 2200
+          username: andrey
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "🚀 Starting deployment..."
+
+            # Переходим в папку приложения
+            cd ~/Desktop/DevOps_lab1/catty-reminders-app
+
+            # Обновляем код из ветки lab2
+            git fetch origin lab2
+            git reset --hard origin/lab2
+
+            # Устанавливаем зависимости
+            pip3 install --break-system-packages -r requirements.txt
+
+            # Перезапускаем приложение
+            sudo systemctl restart ssh
+            sudo systemctl restart catty-app.service
+
+            echo "✅ Deployment complete!"
