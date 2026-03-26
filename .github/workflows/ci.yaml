@@ -21,20 +21,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest-playwright
 
-      - name: Run server and tests
+      - name: Run tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
-          # Указываем, где искать пакеты
-          export PYTHONPATH=$(pwd)/app
-          # Запуск uvicorn сервера в фоне
-          uvicorn app.main:app --host 0.0.0.0 --port 8181 &
-          SERVER_PID=$!
-          sleep 5  # ждём, пока сервер полностью поднимется
-          # Запуск тестов
           pytest --junitxml=test_result.xml
-          # Останавливаем сервер
-          kill $SERVER_PID
 
       - name: Upload test results
         if: always()
