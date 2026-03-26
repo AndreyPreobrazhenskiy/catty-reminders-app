@@ -1,4 +1,4 @@
-name: CI Pipeline
+name: CI
 
 on:
   push:
@@ -11,28 +11,35 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - name: Install dependencies and Playwright
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pytest pytest-playwright
+          playwright install
 
-    - name: Run tests
-      run: |
-        echo "🧪 Running tests..."
-        export PYTHONPATH=$PYTHONPATH:$(pwd)
-        pytest --junitxml=test_result.xml
+      - name: Run application and tests
+        run: |
+          # Запуск сервера в фоне
+          uvicorn catty_reminders.main:app --host 0.0.0.0 --port 8181 &
+          sleep 5
+          # Добавляем корень проекта в PYTHONPATH
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
+          # Запуск тестов с JUnit XML
+          pytest --junitxml=test_result.xml
 
-    - name: Upload test results
-      uses: actions/upload-artifact@v4
-      with:
-        name: test_result
-        path: test_result.xml
-        retention-days: 7
+      - name: Upload test result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test_result
+          path: test_result.xml
+          retention-days: 7
