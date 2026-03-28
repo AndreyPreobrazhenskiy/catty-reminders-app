@@ -22,17 +22,35 @@ jobs:
           script: |
             echo "🚀 Starting deployment on VM..."
 
-            cd ~/Desktop/DevOps_lab1/catty-reminders-app
+            DEPLOY_DIR=~/Desktop/DevOps_lab1/catty-reminders-app
 
-            git fetch origin
-            git reset --hard origin/${{ github.event.release.target_commitish }}
+            # Создаём папку, если её нет
+            mkdir -p $DEPLOY_DIR
 
+            cd $DEPLOY_DIR
+
+            # Если папка уже репозиторий — обновляем, иначе клонируем
+            if [ -d ".git" ]; then
+              git fetch --all --tags
+              git checkout ${{ github.event.release.target_commitish }} || git checkout -b deploy-temp ${{ github.event.release.target_commitish }}
+              git reset --hard ${{ github.event.release.target_commitish }}
+              git clean -fd
+            else
+              git clone git@github.com:AndreyPreobrazhenskiy/catty-reminders-app.git .
+              git checkout ${{ github.event.release.target_commitish }}
+            fi
+
+            # Устанавливаем зависимости
             pip3 install --break-system-packages -r requirements.txt
+
+            # Обновляем референс деплоя
             echo "DEPLOY_REF=${{ github.sha }}" | sudo tee /tmp/deploy_ref.txt
 
+            # Перезапускаем сервис
             sudo systemctl restart catty-app.service
             sleep 5
 
+            # Проверяем доступность приложения
             if curl -s http://localhost:8181/login | grep -q "deployref"; then
               echo "✅ Application is running on port 8181"
             else
