@@ -1,0 +1,30 @@
+services:
+  app:
+    image: ghcr.io/andreypreobrazhenskiy/catty-reminders-app:latest
+    ports:
+      - "8181:8181"
+    environment:
+      - DEPLOY_REF=latest
+    depends_on:
+      - db
+    networks:
+      - app-network
+    pull_policy: always
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: cattydb
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+volumes:
+  db-data:
+
+networks:
+  app-network:
+    driver: bridge
