@@ -6,6 +6,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://user:pass@db:5432/cattydb
       - DEPLOY_REF=${DEPLOY_REF}
+    volumes:
+      - ./config.json:/catty-reminders-app/config.json:ro
     depends_on:
       db:
         condition: service_healthy
