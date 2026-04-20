@@ -25,6 +25,7 @@ jobs:
 
             docker compose pull
             docker compose up -d
+            rm -f .env
 
             echo "⏳ Waiting for application..."
             for i in {1..20}; do
