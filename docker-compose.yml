@@ -4,7 +4,6 @@ services:
     ports:
       - "8181:8181"
     environment:
-      - DATABASE_URL=postgresql://user:pass@db:5432/cattydb
       - DEPLOY_REF=${DEPLOY_REF}
     volumes:
       - ./config.json:/catty-reminders-app/config.json:ro
@@ -16,17 +15,17 @@ services:
     pull_policy: always
 
   db:
-    image: postgres:15-alpine
+    image: mariadb:11
+    restart: always
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: pass
-      POSTGRES_DB: cattydb
+      MYSQL_ROOT_PASSWORD: mypass
+      MYSQL_DATABASE: catty_reminders
     volumes:
-      - db-data:/var/lib/postgresql/data
+      - db-data:/var/lib/mysql
     networks:
       - app-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d cattydb"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
       timeout: 5s
       retries: 10
