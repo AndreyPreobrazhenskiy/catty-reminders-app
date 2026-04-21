@@ -9,7 +9,6 @@ services:
       - ./config.json:/catty-reminders-app/config.json:ro
     depends_on:
       db:
-        condition: service_healthy
     networks:
       - app-network
     pull_policy: always
