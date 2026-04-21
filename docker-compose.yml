@@ -18,10 +18,10 @@ services:
     image: mariadb:11
     restart: always
     environment:
-      MARIADB_ROOT_PASSWORD: mypass
-      MARIADB_DATABASE: catty_reminders
-      MARIADB_USER: user
-      MARIADB_PASSWORD: mypass
+      - MARIADB_ROOT_PASSWORD: mypass
+      - MARIADB_DATABASE: catty_reminders
+      - MARIADB_USER: user
+      - MARIADB_PASSWORD: mypass
     volumes:
       - db-data:/var/lib/mysql
     networks:
