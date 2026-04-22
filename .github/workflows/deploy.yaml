@@ -23,22 +23,5 @@ jobs:
 
             echo "DEPLOY_REF=${{ github.sha }}" > .env
 
-            docker compose pull
-            docker compose up -d
-
-            echo "⏳ Waiting for application..."
-            for i in {1..20}; do
-              if curl -s http://localhost:8181/login 2>/dev/null | grep -q "deployref"; then
-                echo "✅ Application is responding"
-                break
-              fi
-              sleep 3
-            done
-
-            if ! curl -s http://localhost:8181/login 2>/dev/null | grep -q "deployref"; then
-              echo "❌ Application failed health check"
-              docker compose logs
-              exit 1
-            fi
-
-            echo "=== Deployment completed successfully ==="
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            sudo docker compose up -d --pull always --remove-orphans --force-recreate
